@@ -3,6 +3,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import {Feather} from '@expo/vector-icons';
 import { RFValue } from 'react-native-responsive-fontsize';
 import { useTheme } from 'styled-components';
+import { useNetInfo } from '@react-native-community/netinfo';
+
 
 import { BackButton } from '../../components/BackButton';
 import { ImageSlider } from '../../components/ImageSlider';
@@ -61,40 +63,30 @@ export function SchedulingDetails(){
 
   const [loading, setLoading] = useState(false);
   const [ rentalPeriod, setRentalPeriod] = useState<RentalPeriod>({} as RentalPeriod);
+  const [carUpdated, setCarUpdated ] = useState<CarDTO>({} as CarDTO);
 
+  const netInfo = useNetInfo();
   const theme = useTheme();
   const navigation = useNavigation();
 
   const route = useRoute();
   const {  car, dates } = route.params as Params;
 
-  const rentTotal = Number(dates.length * car.rent.price);
+  const rentTotal = Number(dates.length * car.price);
 
   async function handleConfirmRental() {
 
     setLoading(true);
 
-    const schedulesByCar = await api.get(`/schedules_bycars/${car.id}`);
+   
 
-    const unavailable_dates = [
-      ...schedulesByCar.data.unavailable_dates,
-      ...dates,
-    ];
-
-    await api.post('schedules_byuser', { 
+    await api.post('rentals', { 
       user_id: 1,
-      car,
-      startDate: format(getPlataformDate(new Date(dates[0])), 'dd/MM/yyyy'),
-      endDate: format(getPlataformDate(new Date(dates[dates.length - 1])), 'dd/MM/yyyy')
-    })
-    
-
-    api.put(`/schedules_bycars/${car.id}`,
-    {
-      id: car.id,
-      unavailable_dates
-    })
-    .then(()=> 
+      car_id: car.id,
+      start_date: new Date(dates[0]),
+      end_date: new Date(dates[dates.length - 1]),
+      total: rentTotal
+    }).then(()=> 
     {
       navigation.navigate('Confirmation', {
         nextScreenRoute: 'Home',
@@ -102,8 +94,9 @@ export function SchedulingDetails(){
         message: `Agora você só precisa ir\naté a concessionária da RENTX\npegar o seu autómovel.`
       })
     })
-    .catch(()=>{
+    .catch((error)=>{
       setLoading(false);
+      console.log(error);
      Alert.alert('Não foi possível confirmar o agendamento');
     });
 
@@ -119,7 +112,20 @@ export function SchedulingDetails(){
       start: format(getPlataformDate(new Date(dates[0])), 'dd/MM/yyyy'),
       end: format(getPlataformDate(new Date(dates[dates.length - 1])), 'dd/MM/yyyy'),
     })
-  }, [])
+  }, []);
+
+  useEffect(()=>{
+    async function fetchCarUpdated(){
+      const response = await api.get(`/cars/${car.id}`);
+
+      setCarUpdated(response.data);
+      
+    }
+    if(netInfo.isConnected===true){
+      fetchCarUpdated();
+    }
+
+  }, [netInfo.isConnected]);
    return(
             <Container>
               <Header>
@@ -129,8 +135,11 @@ export function SchedulingDetails(){
               </Header>
 
                 <CarImages>
-                  <ImageSlider 
-                  imageUrl={car.photos}/>
+                <ImageSlider 
+                  imageUrl={
+                    !!carUpdated.photos ?
+                    carUpdated.photos : [{id: car.thumbnail, photo: car.thumbnail}]
+                   }/>
                 </CarImages>
 
                 <Content>
@@ -142,27 +151,30 @@ export function SchedulingDetails(){
                       
                       <Rent>
 
-                        <Period>{car.rent.period}</Period>
-                        <Price>R$ {car.rent.price}</Price>
+                        <Period>{car.period}</Period>
+                        <Price>R$ {car.price}</Price>
                       </Rent>
                       
                     </Details>
 
+                    { 
+                    carUpdated.accessories && 
                     <Accessories>
-                    { car.accessories.map(accessory => (
+                      {
+                      carUpdated.accessories.map(accessory => (
+                        
+                        <Accessory 
+                        key={accessory.type}
+                        name={accessory.name} 
+                          // nao coloco em arrowfunction '()=>' porque a funcao nao vai aguardar clique, ou seja vai ser rederizado no inicio  
+                          icon={getAccessoryIcons(accessory.type)}
+                          
+                          /> 
 
-                      <Accessory 
-                      key={accessory.type}
-                      name={accessory.name} 
-                      icon={getAccessoryIcons(accessory.type)}/>
-
-                    ))
-                      
-                      }
-                   
-                   
-
+                      ))
+                    }      
                     </Accessories>
+                   }
                    
                    <RentalPeriod>
                     <CalendarIcon>
@@ -194,7 +206,7 @@ export function SchedulingDetails(){
                   <RentalPrice>
                     <RentalPriceLabel>Total</RentalPriceLabel>
                     <RentalPriceDetail>
-                      <RentalPriceQuota>{`R$ ${car.rent.price} x${dates.length} diárias`}</RentalPriceQuota>
+                      <RentalPriceQuota>{`R$ ${car.price} x${dates.length} diárias`}</RentalPriceQuota>
                       <RentalPriceTotal>R$ {rentTotal}</RentalPriceTotal>
                     </RentalPriceDetail>
                   </RentalPrice>

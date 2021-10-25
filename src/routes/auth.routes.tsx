@@ -3,7 +3,6 @@ import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 
 import { Confirmation } from '../screens/Confirmation';
-import { Splash } from '../screens/Splash';
 import { SignIn } from '../screens/SignIn';
 import { SingUpFirstStep } from '../screens/SingUp/SingUpFirstStep';
 import { SingUpSecondStep } from '../screens/SingUp/SingUpSecondStep';
@@ -20,14 +19,8 @@ return(
   screenOptions={{
     headerShown: false,
   }}
-  initialRouteName="Splash"
+  initialRouteName="SignIn"
   >
-
-  <Screen
-  
-  name="Splash"
-  component={Splash}
-  />
 
   <Screen
   
